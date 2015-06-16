@@ -1,0 +1,28 @@
+{
+  "name": "graffiti",
+  "version": "0.1.1",
+  "homepage": "https://github.com/jayphelps/graffiti",
+  "authors": [
+    "Jay Phelps <hello@jayphelps.com>"
+  ],
+  "description": "Runtime for graffiti, universal web component format",
+  "main": "dist/graffiti-runtime.js",
+  "moduleType": [
+    "amd"
+  ],
+  "keywords": [
+    "web components",
+    "components",
+    "polymer",
+    "w3c",
+    "custom elements",
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
