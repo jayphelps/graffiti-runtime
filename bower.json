@@ -15,7 +15,7 @@
     "components",
     "polymer",
     "w3c",
-    "custom elements",
+    "custom elements"
   ],
   "license": "MIT",
   "ignore": [
