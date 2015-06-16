@@ -1,8 +1,8 @@
 {
   "name": "graffiti-runtime",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "",
-  "main": "dist/graffiti.js",
+  "main": "dist/graffiti-runtime.js",
   "scripts": {
     "start": "broccoli serve",
     "build": "rm -rf dist && broccoli build dist",
