@@ -71,7 +71,7 @@ const bundle = concat(mergeTrees([vendor, main]), {
     'vendor.js',
     '**/*.js',
   ],
-  outputFile: '/' + packageName + '.js'
+  outputFile: '/' + pkg.name + '.js'
 });
 
 module.exports = mergeTrees([bundle, indexHtml]);
