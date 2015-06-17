@@ -15,9 +15,7 @@ export default {
       meta.pendingAttributeChangeCount++;
     }
 
-    // @TODO: can't use super.setAttribute() because of babel bug
-    // but this doesn't handle SVG!
-    return HTMLElement.prototype.setAttribute.apply(this, arguments);
+    return super.setAttribute(...arguments);
   },
 
   removeAttribute(key) {
@@ -27,9 +25,7 @@ export default {
       meta.pendingAttributeChangeCount++;
     }
 
-    // @TODO: can't use super.removeAttribute() because of babel bug
-    // but this doesn't handle SVG!
-    return HTMLElement.prototype.removeAttribute.apply(this, arguments);
+    return super.setAttribute(...arguments);
   },
 
   createdCallback() {
