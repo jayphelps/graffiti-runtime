@@ -67,17 +67,17 @@ export default {
       ...Zone.longStackTraceZone,
 
       afterTask: () => {
-        meta.isCheckingAttributes === true;
+        meta.isCheckingAttributes = true;
         this._renderNode.lastResult.rerender();
-        meta.isCheckingAttributes === false;
+        meta.isCheckingAttributes = false;
       }
     });
 
     mountZone.run(function () {
-      meta.isCheckingAttributes === true;
+      meta.isCheckingAttributes = true;
       this.renderer.renderInner(this);
       injectStyle(cssRegistry[this.tagName.toLowerCase()]);
-      meta.isCheckingAttributes === false;
+      meta.isCheckingAttributes = false;
     }, this);
 
     meta.isInitializing = false;

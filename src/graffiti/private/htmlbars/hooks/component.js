@@ -32,45 +32,4 @@ export default function componentHook(renderNode, env, scope, tagName, params, a
     const fragment = render(templates.default, env, scope, renderOptions).fragment;
     element.appendChild(fragment);
   }
-
-
-
-  //debugger;
-
-  //var fragment = render(template, env, scope, {}).fragment;
-  //element.appendChild(fragment);
-  //morph.setNode(element);
-
-  /*var state = renderNode.state;
-
-  // Determine if this is an initial render or a re-render
-  if (state.manager) {
-    state.manager.rerender(env, attrs, visitor);
-    return;
-  }
-
-  let tagName = _tagName;
-  let isAngleBracket = false;
-
-  if (tagName.charAt(0) === '<') {
-    tagName = tagName.slice(1, -1);
-    isAngleBracket = true;
-  }
-
-  var read = env.hooks.getValue;
-  var parentView = read(scope.view);
-
-  var manager = ComponentNodeManager.create(renderNode, env, {
-    tagName,
-    params,
-    attrs,
-    parentView,
-    templates,
-    isAngleBracket,
-    parentScope: scope
-  });
-
-  state.manager = manager;
-
-  manager.render(env, visitor);*/
 }
