@@ -6539,70 +6539,73 @@ define('dom-helper/prop', ['exports'], function (exports) {
     return true;
   }
 });
-define('graffiti/decorators/reflectToAttribute', ['exports', 'module', '../private/utils'], function (exports, module, _privateUtils) {
+define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils', '../private/utils'], function (exports, module, _utils, _privateUtils) {
   'use strict';
 
   module.exports = reflectToAttribute;
 
-  function reflectToAttribute(attrName) {
-    return function (target, key, _ref) {
-      var enumerable = _ref.enumerable;
-      var initializer = _ref.initializer;
+  function decorateDescriptor(target, attrName, _ref) {
+    var key = _ref.key;
+    var enumerable = _ref.enumerable;
+    var initializer = _ref.initializer;
 
-      var hasInitialized = false;
-      var value = undefined;
+    var hasInitialized = false;
+    var value = undefined;
 
-      if (attrName === undefined) {
-        attrName = key;
-      }
+    if (attrName === undefined) {
+      attrName = key;
+    }
 
-      return {
-        // Keep these the same from the original descriptor
-        key: key, enumerable: enumerable,
+    return {
+      // Keep these the same from the original descriptor
+      key: key, enumerable: enumerable,
 
-        get: function get() {
-          if (hasInitialized) {
-            return value;
-          } else {
-            hasInitialized = true;
-            return value = this[key] = initializer.call(this);
-          }
-        },
-
-        set: function set(newValue) {
-          var meta = (0, _privateUtils.metaFor)(this);
-
-          value = newValue;
-
-          if (meta.isInitializing) {
-            // Don't reflect the value during initialization
-            // Otherwise it will blow any value the consumer set
-            if (this.hasAttribute(attrName)) {
-              return;
-            }
-          }
-
-          meta.isCheckingAttributes = true;
-
-          switch (value) {
-            case true:
-              this.setAttribute(attrName, '');
-              break;
-
-            case false:
-            case null:
-            case undefined:
-              this.removeAttribute(attrName);
-              break;
-
-            default:
-              this.setAttribute(attrName, '' + value);
-          }
-
-          meta.isCheckingAttributes = false;
+      get: function get() {
+        if (hasInitialized) {
+          return value;
+        } else {
+          hasInitialized = true;
+          return value = this[key] = initializer.call(this);
         }
-      };
+      },
+
+      set: function set(newValue) {
+        var meta = (0, _privateUtils.metaFor)(this);
+
+        value = newValue;
+
+        if (meta.isInitializing) {
+          // Don't reflect the value during initialization
+          // Otherwise it will blow any value the consumer set
+          if (this.hasAttribute(attrName)) {
+            return;
+          }
+        }
+
+        meta.isCheckingAttributes = true;
+
+        switch (value) {
+          case true:
+            this.setAttribute(attrName, '');
+            break;
+
+          case false:
+          case null:
+          case undefined:
+            this.removeAttribute(attrName);
+            break;
+
+          default:
+            this.setAttribute(attrName, '' + value);
+        }
+
+        meta.isCheckingAttributes = false;
+      }
     };
+  }
+
+  function reflectToAttribute() {
+    return (0, _utils.decorate)(decorateDescriptor, arguments);
   }
 });
 define('graffiti/decorators/registerElement', ['exports', 'module', '../mixins/Component', '../private/utils'], function (exports, module, _mixinsComponent, _privateUtils) {
@@ -6640,6 +6643,65 @@ define('graffiti/decorators/registerElement', ['exports', 'module', '../mixins/C
 
 // Guards against calling the actual HTMLElement|SVGElement constructor
 // because that's not currently supported
+define('graffiti/decorators/utils', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, '__esModule', {
+    value: true
+  });
+  var _slice = Array.prototype.slice;
+  exports.isDescriptor = isDescriptor;
+  exports.decorate = decorate;
+
+  function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } }
+
+  function isDescriptor(desc) {
+    if (!desc || !desc.hasOwnProperty) {
+      return false;
+    }
+
+    var keys = ['value', 'get', 'set'];
+
+    var _iteratorNormalCompletion = true;
+    var _didIteratorError = false;
+    var _iteratorError = undefined;
+
+    try {
+      for (var _iterator = keys[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+        var key = _step.value;
+
+        if (desc.hasOwnProperty(key)) {
+          return true;
+        }
+      }
+    } catch (err) {
+      _didIteratorError = true;
+      _iteratorError = err;
+    } finally {
+      try {
+        if (!_iteratorNormalCompletion && _iterator['return']) {
+          _iterator['return']();
+        }
+      } finally {
+        if (_didIteratorError) {
+          throw _iteratorError;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  function decorate(decorator, entryArgs) {
+    if (isDescriptor(entryArgs[entryArgs.length - 1])) {
+      return decorator.apply(undefined, _toConsumableArray(entryArgs).concat([[]]));
+    } else {
+      return function () {
+        return decorator.apply(undefined, _slice.call(arguments).concat([entryArgs]));
+      };
+    }
+  }
+});
 define('graffiti', ['exports', 'graffiti/decorators/registerElement', 'graffiti/decorators/reflectToAttribute'], function (exports, _graffitiDecoratorsRegisterElement, _graffitiDecoratorsReflectToAttribute) {
   'use strict';
 
@@ -6657,10 +6719,6 @@ define('graffiti/mixins/Component', ['exports', 'module', '../private/Renderer',
 
   var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
-  var _obj;
-
-  var _get = function get(_x, _x2, _x3) { var _again = true; _function: while (_again) { var object = _x, property = _x2, receiver = _x3; desc = parent = getter = undefined; _again = false; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { _x = parent; _x2 = property; _x3 = receiver; _again = true; continue _function; } } else if ('value' in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } } };
-
   function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
 
   var _Renderer = _interopRequireDefault(_privateRenderer);
@@ -6668,7 +6726,7 @@ define('graffiti/mixins/Component', ['exports', 'module', '../private/Renderer',
   var _DOMHelper = _interopRequireDefault(_privateDOMHelper);
 
   var getPrototypeOf = Object.getPrototypeOf;
-  module.exports = _obj = {
+  module.exports = {
     setAttribute: function setAttribute(key, value) {
       var meta = (0, _privateUtils.metaFor)(this);
 
@@ -6676,7 +6734,7 @@ define('graffiti/mixins/Component', ['exports', 'module', '../private/Renderer',
         meta.pendingAttributeChangeCount++;
       }
 
-      return _get(Object.getPrototypeOf(_obj), 'setAttribute', this).apply(this, arguments);
+      return getPrototypeOf(getPrototypeOf(this)).setAttribute.apply(this, arguments);
     },
 
     removeAttribute: function removeAttribute(key) {
@@ -6686,7 +6744,7 @@ define('graffiti/mixins/Component', ['exports', 'module', '../private/Renderer',
         meta.pendingAttributeChangeCount++;
       }
 
-      return _get(Object.getPrototypeOf(_obj), 'setAttribute', this).apply(this, arguments);
+      return getPrototypeOf(getPrototypeOf(this)).removeAttribute.apply(this, arguments);
     },
 
     createdCallback: function createdCallback() {
@@ -6734,17 +6792,17 @@ define('graffiti/mixins/Component', ['exports', 'module', '../private/Renderer',
       var mountZone = (0, _privateUtils.metaFor)(this).zone = zone.fork(_extends({}, Zone.longStackTraceZone, {
 
         afterTask: function afterTask() {
-          meta.isCheckingAttributes === true;
+          meta.isCheckingAttributes = true;
           _this._renderNode.lastResult.rerender();
-          meta.isCheckingAttributes === false;
+          meta.isCheckingAttributes = false;
         }
       }));
 
       mountZone.run(function () {
-        meta.isCheckingAttributes === true;
+        meta.isCheckingAttributes = true;
         this.renderer.renderInner(this);
         injectStyle(_privateRegistrationCss.registry[this.tagName.toLowerCase()]);
-        meta.isCheckingAttributes === false;
+        meta.isCheckingAttributes = false;
       }, this);
 
       meta.isInitializing = false;
@@ -6953,38 +7011,6 @@ define('graffiti/private/htmlbars/hooks/component', ['exports', 'module', '../..
       var fragment = (0, _htmlbarsRuntime.render)(templates['default'], env, scope, renderOptions).fragment;
       element.appendChild(fragment);
     }
-
-    //debugger;
-
-    //var fragment = render(template, env, scope, {}).fragment;
-    //element.appendChild(fragment);
-    //morph.setNode(element);
-
-    /*var state = renderNode.state;
-     // Determine if this is an initial render or a re-render
-    if (state.manager) {
-      state.manager.rerender(env, attrs, visitor);
-      return;
-    }
-     let tagName = _tagName;
-    let isAngleBracket = false;
-     if (tagName.charAt(0) === '<') {
-      tagName = tagName.slice(1, -1);
-      isAngleBracket = true;
-    }
-     var read = env.hooks.getValue;
-    var parentView = read(scope.view);
-     var manager = ComponentNodeManager.create(renderNode, env, {
-      tagName,
-      params,
-      attrs,
-      parentView,
-      templates,
-      isAngleBracket,
-      parentScope: scope
-    });
-     state.manager = manager;
-     manager.render(env, visitor);*/
   }
 });
 define('graffiti/private/htmlbars/hooks', ['exports', 'module', 'htmlbars-runtime', 'graffiti/private/htmlbars/hooks/component'], function (exports, module, _htmlbarsRuntime, _graffitiPrivateHtmlbarsHooksComponent) {

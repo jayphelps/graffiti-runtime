@@ -15,7 +15,7 @@ export default {
       meta.pendingAttributeChangeCount++;
     }
 
-    return super.setAttribute(...arguments);
+    return getPrototypeOf(getPrototypeOf(this)).setAttribute.apply(this, arguments);
   },
 
   removeAttribute(key) {
@@ -25,7 +25,7 @@ export default {
       meta.pendingAttributeChangeCount++;
     }
 
-    return super.setAttribute(...arguments);
+    return getPrototypeOf(getPrototypeOf(this)).removeAttribute.apply(this, arguments);
   },
 
   createdCallback() {

@@ -1,7 +1,7 @@
 import { decorate } from './utils';
 import { metaFor } from '../private/utils';
 
-function decorateDescriptor(target, key, { enumerable, initializer }) {
+function decorateDescriptor(target, attrName, { key, enumerable, initializer }) {
   let hasInitialized = false;
   let value;
 
