@@ -6,6 +6,7 @@ export default class Meta {
   isCheckingAttributes = false;
   pendingAttributeChangeCount = 0;
   zone = null;
+  descriptors = {};
 
   constructor() {
     seal(this);

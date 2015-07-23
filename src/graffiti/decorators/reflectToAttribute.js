@@ -1,9 +1,17 @@
 import { decorate } from './utils';
 import { metaFor } from '../private/utils';
 
-function decorateDescriptor(target, attrName, { key, enumerable, initializer }) {
-  target.hasInitialized = false;
+function metaForDescriptor(context, key) {
+  const { descriptors } = metaFor(context);
+  let descMeta = descriptors[key];
+  if (!descMeta) {
+    descMeta = descriptors[key] = { hasRunInitializer: false, value: undefined };
+  }
 
+  return descMeta;
+}
+
+function decorateDescriptor(target, key, { enumerable, initializer }, [attrName] = []) {
   if (attrName === undefined) {
     attrName = key;
   }
@@ -13,31 +21,34 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
     key, enumerable,
 
     get() {
-      if (this.hasInitialized) {
-        return this[key];
+      const descMeta = metaForDescriptor(this, key);
+
+      if (descMeta.hasRunInitializer) {
+        return descMeta.value;
       } else {
-        this.hasInitialized = true;
-        return this[key] = initializer.call(this);
+        const ret = descMeta.value = initializer.call(this);
+        descMeta.hasRunInitializer = true;
+        return ret;
       }
     },
 
     set(newValue) {
       const meta = metaFor(this);
+      const descMeta = metaForDescriptor(this, key);
 
-      this[key] = newValue;
+      descMeta.value = newValue;
 
       if (meta.isInitializing) {
-        // Don't reflect the value during initialization
-        // Otherwise it will blow any value the consumer set
+        // Don't reflect the value during class instance initialization
+        // otherwise it will blow away any value the consumer set
         if (this.hasAttribute(attrName)) {
           return;
         }
       }
 
-
       meta.isCheckingAttributes = true;
 
-      switch (this[key]) {
+      switch (newValue) {
         case true:
           this.setAttribute(attrName, '');
           break;
@@ -49,7 +60,7 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
           break;
 
         default:
-          this.setAttribute(attrName, '' + this[key]);
+          this.setAttribute(attrName, '' + newValue);
       }
 
       meta.isCheckingAttributes = false;
@@ -57,6 +68,6 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
   };
 }
 
-export default function reflectToAttribute() {
-  return decorate(decorateDescriptor, arguments);
+export default function reflectToAttribute(...args) {
+  return decorate(decorateDescriptor, args);
 }
