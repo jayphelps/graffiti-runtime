@@ -17,7 +17,7 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
         return this[key];
       } else {
         this.hasInitialized = true;
-        return value = this[key] = initializer.call(this);
+        return this[key] = initializer.call(this);
       }
     },
 
