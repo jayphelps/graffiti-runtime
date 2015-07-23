@@ -6917,8 +6917,7 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
     var enumerable = _ref.enumerable;
     var initializer = _ref.initializer;
 
-    var hasInitialized = false;
-    var value = undefined;
+    target.hasInitialized = false;
 
     if (attrName === undefined) {
       attrName = key;
@@ -6929,18 +6928,18 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
       key: key, enumerable: enumerable,
 
       get: function get() {
-        if (hasInitialized) {
-          return value;
+        if (this.hasInitialized) {
+          return this[key];
         } else {
-          hasInitialized = true;
-          return value = this[key] = initializer.call(this);
+          this.hasInitialized = true;
+          return this[key] = initializer.call(this);
         }
       },
 
       set: function set(newValue) {
         var meta = (0, _privateUtils.metaFor)(this);
 
-        value = newValue;
+        this[key] = newValue;
 
         if (meta.isInitializing) {
           // Don't reflect the value during initialization
@@ -6952,7 +6951,7 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
 
         meta.isCheckingAttributes = true;
 
-        switch (value) {
+        switch (this[key]) {
           case true:
             this.setAttribute(attrName, '');
             break;
@@ -6964,7 +6963,7 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
             break;
 
           default:
-            this.setAttribute(attrName, '' + value);
+            this.setAttribute(attrName, '' + this[key]);
         }
 
         meta.isCheckingAttributes = false;
