@@ -2,8 +2,7 @@ import { decorate } from './utils';
 import { metaFor } from '../private/utils';
 
 function decorateDescriptor(target, attrName, { key, enumerable, initializer }) {
-  let hasInitialized = false;
-  let value;
+  target.hasInitialized = false;
 
   if (attrName === undefined) {
     attrName = key;
@@ -14,10 +13,10 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
     key, enumerable,
 
     get() {
-      if (hasInitialized) {
-        return value;
+      if (this.hasInitialized) {
+        return this[key];
       } else {
-        hasInitialized = true;
+        this.hasInitialized = true;
         return value = this[key] = initializer.call(this);
       }
     },
@@ -25,7 +24,7 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
     set(newValue) {
       const meta = metaFor(this);
 
-      value = newValue;
+      this[key] = newValue;
 
       if (meta.isInitializing) {
         // Don't reflect the value during initialization
@@ -35,9 +34,10 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
         }
       }
 
+
       meta.isCheckingAttributes = true;
 
-      switch (value) {
+      switch (this[key]) {
         case true:
           this.setAttribute(attrName, '');
           break;
@@ -49,9 +49,9 @@ function decorateDescriptor(target, attrName, { key, enumerable, initializer }) 
           break;
 
         default:
-          this.setAttribute(attrName, '' + value);
+          this.setAttribute(attrName, '' + this[key]);
       }
-      
+
       meta.isCheckingAttributes = false;
     }
   };

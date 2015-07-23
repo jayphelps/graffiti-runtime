@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import reflectToAttribute from '../../src/graffiti/decorators/reflectToAttribute';
+import reflectToAttribute from '../../../../src/graffiti/decorators/reflectToAttribute';
 
 describe('reflectToAttribute', () => {
 
@@ -7,5 +7,5 @@ describe('reflectToAttribute', () => {
     var example = new Example();
     expect(example.isExampleClass).to.equal(true);
   });
-  
+
 });
