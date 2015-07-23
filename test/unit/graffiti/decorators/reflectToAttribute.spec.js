@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import reflectToAttribute from '../../../../src/graffiti/decorators/reflectToAttribute';
 import { spy } from 'sinon';
-var setAttributeSpy = spy(), removeAttributeSpy = spy();
 
 class MockHTMLElement {
   constructor() {
