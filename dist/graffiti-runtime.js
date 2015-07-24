@@ -6910,14 +6910,32 @@ define('dom-helper/prop', ['exports'], function (exports) {
 define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils', '../private/utils'], function (exports, module, _utils, _privateUtils) {
   'use strict';
 
+  var _slicedToArray = (function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i['return']) _i['return'](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError('Invalid attempt to destructure non-iterable instance'); } }; })();
+
   module.exports = reflectToAttribute;
 
-  function decorateDescriptor(target, attrName, _ref) {
-    var key = _ref.key;
+  function metaForDescriptor(context, key) {
+    var _metaFor = (0, _privateUtils.metaFor)(context);
+
+    var descriptors = _metaFor.descriptors;
+
+    var descMeta = descriptors[key];
+    if (!descMeta) {
+      descMeta = descriptors[key] = { hasRunInitializer: false, value: undefined };
+    }
+
+    return descMeta;
+  }
+
+  function decorateDescriptor(target, key, _ref) {
     var enumerable = _ref.enumerable;
     var initializer = _ref.initializer;
 
-    target.hasInitialized = false;
+    var _ref2 = arguments.length <= 3 || arguments[3] === undefined ? [] : arguments[3];
+
+    var _ref22 = _slicedToArray(_ref2, 1);
+
+    var attrName = _ref22[0];
 
     if (attrName === undefined) {
       attrName = key;
@@ -6928,22 +6946,26 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
       key: key, enumerable: enumerable,
 
       get: function get() {
-        if (this.hasInitialized) {
-          return this[key];
+        var descMeta = metaForDescriptor(this, key);
+
+        if (descMeta.hasRunInitializer) {
+          return descMeta.value;
         } else {
-          this.hasInitialized = true;
-          return this[key] = initializer.call(this);
+          var ret = descMeta.value = initializer.call(this);
+          descMeta.hasRunInitializer = true;
+          return ret;
         }
       },
 
       set: function set(newValue) {
         var meta = (0, _privateUtils.metaFor)(this);
+        var descMeta = metaForDescriptor(this, key);
 
-        this[key] = newValue;
+        descMeta.value = newValue;
 
         if (meta.isInitializing) {
-          // Don't reflect the value during initialization
-          // Otherwise it will blow any value the consumer set
+          // Don't reflect the value during class instance initialization
+          // otherwise it will blow away any value the consumer set
           if (this.hasAttribute(attrName)) {
             return;
           }
@@ -6951,7 +6973,7 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
 
         meta.isCheckingAttributes = true;
 
-        switch (this[key]) {
+        switch (newValue) {
           case true:
             this.setAttribute(attrName, '');
             break;
@@ -6963,7 +6985,7 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
             break;
 
           default:
-            this.setAttribute(attrName, '' + this[key]);
+            this.setAttribute(attrName, '' + newValue);
         }
 
         meta.isCheckingAttributes = false;
@@ -6972,7 +6994,11 @@ define('graffiti/decorators/reflectToAttribute', ['exports', 'module', './utils'
   }
 
   function reflectToAttribute() {
-    return (0, _utils.decorate)(decorateDescriptor, arguments);
+    for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    return (0, _utils.decorate)(decorateDescriptor, args);
   }
 });
 define('graffiti/decorators/registerElement', ['exports', 'module', '../mixins/Component', '../private/utils'], function (exports, module, _mixinsComponent, _privateUtils) {
@@ -7277,315 +7303,6 @@ define('graffiti/private/DOMHelper', ['exports', 'module', 'dom-helper'], functi
   })(_DefaultDOMHelper2['default']);
 
   module.exports = DOMHelper;
-});
-define('graffiti/private/Renderer', ['exports', 'htmlbars-runtime', './utils', './ViewNodeManager', './htmlbars/env'], function (exports, _htmlbarsRuntime, _utils, _ViewNodeManager, _htmlbarsEnv) {
-  'use strict';
-
-  Object.defineProperty(exports, '__esModule', {
-    value: true
-  });
-
-  var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
-
-  exports.buildComponentTemplate = buildComponentTemplate;
-  exports.renderHTMLBarsBlock = renderHTMLBarsBlock;
-
-  function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
-
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
-
-  var _ViewNodeManager2 = _interopRequireDefault(_ViewNodeManager);
-
-  var _defaultEnv = _interopRequireDefault(_htmlbarsEnv);
-
-  var Renderer = (function () {
-    function Renderer(domHelper) {
-      _classCallCheck(this, Renderer);
-
-      this._dom = domHelper;
-    }
-
-    _createClass(Renderer, [{
-      key: 'prerenderTopLevelView',
-      value: function prerenderTopLevelView(view, renderNode) {
-        if (view._state === 'inDOM') {
-          throw new Error('You cannot insert a view that has already been rendered');
-        }
-
-        view._ownerView = renderNode._ownerView = view;
-        view._renderNode = renderNode;
-
-        var layout = view.layout;
-        var template = view.template;
-
-        var componentInfo = { component: view, view: view, layout: layout };
-
-        var block = buildComponentTemplate(componentInfo, {}, {
-          self: view,
-          template: template && template.raw
-        }).block;
-
-        view.renderBlock(block, renderNode);
-        view.lastResult = renderNode.lastResult;
-
-        this.clearRenderedViews(view.env);
-      }
-    }, {
-      key: 'renderTopLevelView',
-      value: function renderTopLevelView(view, renderNode) {
-        // Check to see if insertion has been canceled
-        if (view._willInsert) {
-          view._willInsert = false;
-          this.prerenderTopLevelView(view, renderNode);
-          this.dispatchLifecycleHooks(view.env);
-        }
-      }
-    }, {
-      key: 'revalidateTopLevelView',
-      value: function revalidateTopLevelView(_ref) {
-        var renderNode = _ref._renderNode;
-        var viewState = _ref._state;
-        var env = _ref.env;
-
-        // This guard prevents revalidation on an already-destroyed view.
-        if (renderNode.lastResult) {
-          renderNode.lastResult.revalidate(env);
-          // supports createElement, which operates without moving the view into
-          // the inDOM state.
-          if (viewState === 'inDOM') {
-            this.dispatchLifecycleHooks(env);
-          }
-
-          this.clearRenderedViews(env);
-        }
-      }
-    }, {
-      key: 'dispatchLifecycleHooks',
-      value: function dispatchLifecycleHooks(_ref2) {
-        var ownerView = _ref2.view;
-        var lifecycleHooks = _ref2.lifecycleHooks;
-
-        // @TODO: is `view` actually ever different than `ownerView`??
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
-
-        try {
-          for (var _iterator = lifecycleHooks[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var _step$value = _step.value;
-            var type = _step$value.type;
-            var view = _step$value.view;
-
-            ownerView._dispatching = type;
-
-            switch (type) {
-              case 'didInsertElement':
-                this.didInsertElement(view);
-                break;
-
-              case 'didUpdate':
-                this.didUpdate(view);
-                break;
-
-              default:
-                throw new Error('Unhandled lifecycle hook: ' + type);
-            }
-
-            this.didRender(view);
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator['return']) {
-              _iterator['return']();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
-        }
-
-        ownerView._dispatching = null;
-        lifecycleHooks.length = 0;
-      }
-    }, {
-      key: 'didInsertElement',
-      value: function didInsertElement(view) {
-        if (view._transitionTo) {
-          view._transitionTo('inDOM');
-        }
-
-        if (view.trigger) {
-          view.trigger('didInsertElement');
-        }
-      }
-    }, {
-      key: 'didUpdate',
-      value: function didUpdate(view) {
-        if (view.trigger) {
-          view.trigger('didUpdate');
-        }
-      }
-    }, {
-      key: 'didRender',
-      value: function didRender(view) {
-        if (view.trigger) {
-          view.trigger('didRender');
-        }
-      }
-    }, {
-      key: 'clearRenderedViews',
-      value: function clearRenderedViews(env) {
-        env.renderedViews.length = 0;
-      }
-    }, {
-      key: 'renderInner',
-      value: function renderInner(view) {
-        /*const morph = this._dom.createElementMorph(view, view.namespaceURI);
-        morph.ownerNode = morph;
-        morph.isRootNode = true;*/
-        view._willInsert = true;
-
-        var contentNodes = document.createDocumentFragment();
-
-        {
-          var childNodes = view.childNodes;
-
-          for (var i = 0, l = childNodes.length; i < l; i++) {
-            contentNodes.appendChild(childNodes[i]);
-          }
-        }
-
-        var innerMorph = this._dom.insertMorphBefore(view, view.firstChild, view);
-        //const innerMorph = this._dom.replaceContentWithMorph(view);
-
-        innerMorph.ownerNode = innerMorph;
-
-        this.renderTopLevelView(view, innerMorph);
-
-        var content = view.getElementsByTagName('content')[0];
-        if (content) {
-          content.parentNode.replaceChild(contentNodes, content);
-        }
-      }
-    }]);
-
-    return Renderer;
-  })();
-
-  exports['default'] = Renderer;
-
-  function buildComponentTemplate(_ref3, attrs, content) {
-    var _ref3$component = _ref3.component;
-    var component = _ref3$component === undefined ? null : _ref3$component;
-    var layout = _ref3.layout;
-
-    var tagName = null;
-    var blockToRender = undefined;
-
-    if (content.template) {
-      blockToRender = createContentBlock(content.template, content.scope, content.self, component);
-    }
-
-    if (layout && layout.raw) {
-      blockToRender = createLayoutBlock(layout.raw, blockToRender, content.self, component, attrs);
-    }
-
-    return { createdElement: false, block: blockToRender };
-  }
-
-  function blockFor(template, options) {
-    (0, _utils.assert)(!!template, 'BUG: Must pass a template to blockFor');
-    return _htmlbarsRuntime.internal.blockFor(_htmlbarsRuntime.render, template, options);
-  }
-
-  function createContentBlock(template, scope, self, component) {
-    (0, _utils.assert)(!(scope && self), 'BUG: buildComponentTemplate can take a scope or a self, but not both');
-
-    return blockFor(template, {
-      scope: scope,
-      self: self,
-      options: { view: component }
-    });
-  }
-
-  function renderHTMLBarsBlock(view, block, renderNode) {
-    var env = {
-      lifecycleHooks: [],
-      renderedViews: [],
-      view: view,
-      outletState: view.outletState,
-      container: view.container,
-      renderer: view.renderer,
-      dom: view.renderer._dom,
-      hooks: _defaultEnv['default'].hooks,
-      helpers: _defaultEnv['default'].helpers,
-      useFragmentCache: _defaultEnv['default'].useFragmentCache
-    };
-
-    view.env = env;
-    //createOrUpdateComponent(view, {}, null, renderNode, env);
-    var nodeManager = new _ViewNodeManager2['default'](view, null, renderNode, block, view._ownerView !== view);
-
-    nodeManager.render(env, {});
-  }
-});
-define("graffiti/private/ViewNodeManager", ["exports", "module"], function (exports, module) {
-  "use strict";
-
-  var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
-
-  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-  var ViewNodeManager = (function () {
-    function ViewNodeManager(component, scope, renderNode, block) {
-      _classCallCheck(this, ViewNodeManager);
-
-      this.component = component;
-      this.scope = scope;
-      this.renderNode = renderNode;
-      this.block = block;
-    }
-
-    _createClass(ViewNodeManager, [{
-      key: "render",
-      value: function render(env, attrs, visitor) {
-        var newEnv = env;
-
-        if (this.component) {
-          newEnv = Object.assign({}, env);
-          newEnv.view = this.component;
-        }
-
-        if (this.block) {
-          this.block(newEnv, [], undefined, this.renderNode, this.scope, visitor);
-        }
-      }
-    }, {
-      key: "rerender",
-      value: function rerender(env, attrs, visitor) {
-        var newEnv = env;
-
-        if (component) {
-          newEnv = Object.assign({}, env);
-          newEnv.view = component;
-        }
-
-        if (this.block) {
-          this.block(newEnv, [], undefined, this.renderNode, this.scope, visitor);
-        }
-
-        return newEnv;
-      }
-    }]);
-
-    return ViewNodeManager;
-  })();
-
-  module.exports = ViewNodeManager;
 });
 define('graffiti/private/htmlbars/env', ['exports', 'module', './hooks', './helpers', './keywords'], function (exports, module, _hooks, _helpers, _keywords) {
   'use strict';
@@ -7948,6 +7665,261 @@ define('graffiti/private/registration', ['exports', 'graffiti/private/registrati
     }
   });
 });
+define('graffiti/private/Renderer', ['exports', 'htmlbars-runtime', './utils', './ViewNodeManager', './htmlbars/env'], function (exports, _htmlbarsRuntime, _utils, _ViewNodeManager, _htmlbarsEnv) {
+  'use strict';
+
+  Object.defineProperty(exports, '__esModule', {
+    value: true
+  });
+
+  var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+  exports.buildComponentTemplate = buildComponentTemplate;
+  exports.renderHTMLBarsBlock = renderHTMLBarsBlock;
+
+  function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+
+  var _ViewNodeManager2 = _interopRequireDefault(_ViewNodeManager);
+
+  var _defaultEnv = _interopRequireDefault(_htmlbarsEnv);
+
+  var Renderer = (function () {
+    function Renderer(domHelper) {
+      _classCallCheck(this, Renderer);
+
+      this._dom = domHelper;
+    }
+
+    _createClass(Renderer, [{
+      key: 'prerenderTopLevelView',
+      value: function prerenderTopLevelView(view, renderNode) {
+        if (view._state === 'inDOM') {
+          throw new Error('You cannot insert a view that has already been rendered');
+        }
+
+        view._ownerView = renderNode._ownerView = view;
+        view._renderNode = renderNode;
+
+        var layout = view.layout;
+        var template = view.template;
+
+        var componentInfo = { component: view, view: view, layout: layout };
+
+        var block = buildComponentTemplate(componentInfo, {}, {
+          self: view,
+          template: template && template.raw
+        }).block;
+
+        view.renderBlock(block, renderNode);
+        view.lastResult = renderNode.lastResult;
+
+        this.clearRenderedViews(view.env);
+      }
+    }, {
+      key: 'renderTopLevelView',
+      value: function renderTopLevelView(view, renderNode) {
+        // Check to see if insertion has been canceled
+        if (view._willInsert) {
+          view._willInsert = false;
+          this.prerenderTopLevelView(view, renderNode);
+          this.dispatchLifecycleHooks(view.env);
+        }
+      }
+    }, {
+      key: 'revalidateTopLevelView',
+      value: function revalidateTopLevelView(_ref) {
+        var renderNode = _ref._renderNode;
+        var viewState = _ref._state;
+        var env = _ref.env;
+
+        // This guard prevents revalidation on an already-destroyed view.
+        if (renderNode.lastResult) {
+          renderNode.lastResult.revalidate(env);
+          // supports createElement, which operates without moving the view into
+          // the inDOM state.
+          if (viewState === 'inDOM') {
+            this.dispatchLifecycleHooks(env);
+          }
+
+          this.clearRenderedViews(env);
+        }
+      }
+    }, {
+      key: 'dispatchLifecycleHooks',
+      value: function dispatchLifecycleHooks(_ref2) {
+        var ownerView = _ref2.view;
+        var lifecycleHooks = _ref2.lifecycleHooks;
+
+        // @TODO: is `view` actually ever different than `ownerView`??
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+          for (var _iterator = lifecycleHooks[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            var _step$value = _step.value;
+            var type = _step$value.type;
+            var view = _step$value.view;
+
+            ownerView._dispatching = type;
+
+            switch (type) {
+              case 'didInsertElement':
+                this.didInsertElement(view);
+                break;
+
+              case 'didUpdate':
+                this.didUpdate(view);
+                break;
+
+              default:
+                throw new Error('Unhandled lifecycle hook: ' + type);
+            }
+
+            this.didRender(view);
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator['return']) {
+              _iterator['return']();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+
+        ownerView._dispatching = null;
+        lifecycleHooks.length = 0;
+      }
+    }, {
+      key: 'didInsertElement',
+      value: function didInsertElement(view) {
+        if (view._transitionTo) {
+          view._transitionTo('inDOM');
+        }
+
+        if (view.trigger) {
+          view.trigger('didInsertElement');
+        }
+      }
+    }, {
+      key: 'didUpdate',
+      value: function didUpdate(view) {
+        if (view.trigger) {
+          view.trigger('didUpdate');
+        }
+      }
+    }, {
+      key: 'didRender',
+      value: function didRender(view) {
+        if (view.trigger) {
+          view.trigger('didRender');
+        }
+      }
+    }, {
+      key: 'clearRenderedViews',
+      value: function clearRenderedViews(env) {
+        env.renderedViews.length = 0;
+      }
+    }, {
+      key: 'renderInner',
+      value: function renderInner(view) {
+        /*const morph = this._dom.createElementMorph(view, view.namespaceURI);
+        morph.ownerNode = morph;
+        morph.isRootNode = true;*/
+        view._willInsert = true;
+
+        var contentNodes = document.createDocumentFragment();
+
+        {
+          var childNodes = view.childNodes;
+
+          while (childNodes.length > 0) {
+            contentNodes.appendChild(childNodes[0]);
+          }
+        }
+
+        var innerMorph = this._dom.insertMorphBefore(view, view.firstChild, view);
+        //const innerMorph = this._dom.replaceContentWithMorph(view);
+
+        innerMorph.ownerNode = innerMorph;
+
+        this.renderTopLevelView(view, innerMorph);
+
+        var content = view.getElementsByTagName('content')[0];
+        if (content) {
+          content.parentNode.replaceChild(contentNodes, content);
+        }
+      }
+    }]);
+
+    return Renderer;
+  })();
+
+  exports['default'] = Renderer;
+
+  function buildComponentTemplate(_ref3, attrs, content) {
+    var _ref3$component = _ref3.component;
+    var component = _ref3$component === undefined ? null : _ref3$component;
+    var layout = _ref3.layout;
+
+    var tagName = null;
+    var blockToRender = undefined;
+
+    if (content.template) {
+      blockToRender = createContentBlock(content.template, content.scope, content.self, component);
+    }
+
+    if (layout && layout.raw) {
+      blockToRender = createLayoutBlock(layout.raw, blockToRender, content.self, component, attrs);
+    }
+
+    return { createdElement: false, block: blockToRender };
+  }
+
+  function blockFor(template, options) {
+    (0, _utils.assert)(!!template, 'BUG: Must pass a template to blockFor');
+    return _htmlbarsRuntime.internal.blockFor(_htmlbarsRuntime.render, template, options);
+  }
+
+  function createContentBlock(template, scope, self, component) {
+    (0, _utils.assert)(!(scope && self), 'BUG: buildComponentTemplate can take a scope or a self, but not both');
+
+    return blockFor(template, {
+      scope: scope,
+      self: self,
+      options: { view: component }
+    });
+  }
+
+  function renderHTMLBarsBlock(view, block, renderNode) {
+    var env = {
+      lifecycleHooks: [],
+      renderedViews: [],
+      view: view,
+      outletState: view.outletState,
+      container: view.container,
+      renderer: view.renderer,
+      dom: view.renderer._dom,
+      hooks: _defaultEnv['default'].hooks,
+      helpers: _defaultEnv['default'].helpers,
+      useFragmentCache: _defaultEnv['default'].useFragmentCache
+    };
+
+    view.env = env;
+    //createOrUpdateComponent(view, {}, null, renderNode, env);
+    var nodeManager = new _ViewNodeManager2['default'](view, null, renderNode, block, view._ownerView !== view);
+
+    nodeManager.render(env, {});
+  }
+});
 define('graffiti/private/streams/BehaviorSubject', ['exports', 'module', './Observable'], function (exports, module, _Observable2) {
   'use strict';
 
@@ -8288,6 +8260,7 @@ define('graffiti/private/utils/meta', ['exports'], function (exports) {
     this.isCheckingAttributes = false;
     this.pendingAttributeChangeCount = 0;
     this.zone = null;
+    this.descriptors = {};
 
     seal(this);
   }
@@ -8340,6 +8313,60 @@ define('graffiti/private/utils/type-conversion', ['exports'], function (exports)
 
     return coercedValue;
   }
+});
+define("graffiti/private/ViewNodeManager", ["exports", "module"], function (exports, module) {
+  "use strict";
+
+  var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+  function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+  var ViewNodeManager = (function () {
+    function ViewNodeManager(component, scope, renderNode, block) {
+      _classCallCheck(this, ViewNodeManager);
+
+      this.component = component;
+      this.scope = scope;
+      this.renderNode = renderNode;
+      this.block = block;
+    }
+
+    _createClass(ViewNodeManager, [{
+      key: "render",
+      value: function render(env, attrs, visitor) {
+        var newEnv = env;
+
+        if (this.component) {
+          newEnv = Object.assign({}, env);
+          newEnv.view = this.component;
+        }
+
+        if (this.block) {
+          this.block(newEnv, [], undefined, this.renderNode, this.scope, visitor);
+        }
+      }
+    }, {
+      key: "rerender",
+      value: function rerender(env, attrs, visitor) {
+        var newEnv = env;
+
+        if (component) {
+          newEnv = Object.assign({}, env);
+          newEnv.view = component;
+        }
+
+        if (this.block) {
+          this.block(newEnv, [], undefined, this.renderNode, this.scope, visitor);
+        }
+
+        return newEnv;
+      }
+    }]);
+
+    return ViewNodeManager;
+  })();
+
+  module.exports = ViewNodeManager;
 });
 define("htmlbars-compiler", ["exports", "./htmlbars-compiler/compiler"], function (exports, _htmlbarsCompilerCompiler) {
   "use strict";
