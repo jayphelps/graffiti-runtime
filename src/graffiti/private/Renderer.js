@@ -112,8 +112,8 @@ export default class Renderer {
     
     {
       const { childNodes } = view;
-      for (let i = 0, l = childNodes.length; i < l;i++) {
-        contentNodes.appendChild(childNodes[i]);
+      while (childNodes.length > 0) {
+        contentNodes.appendChild(childNodes[0]);
       }
     }
 
