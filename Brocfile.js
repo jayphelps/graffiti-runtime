@@ -1,8 +1,11 @@
+const path = require('path');
 const funnel = require('broccoli-funnel');
 const concat = require('broccoli-concat');
 const mergeTrees = require('broccoli-merge-trees');
 const esTranspiler = require('broccoli-babel-transpiler');
+const testem = require('broccoli-testem-plugin');
 const pkg = require('./package.json');
+const env = process.env.NODE_ENV;
 
 const src = 'src';
 
@@ -74,4 +77,46 @@ const bundle = concat(mergeTrees([vendor, main]), {
   outputFile: '/' + pkg.name + '.js'
 });
 
-module.exports = mergeTrees([bundle, indexHtml]);
+if (env === 'test') {
+  const testIndex = funnel('test', {
+    include: ['index.mustache']
+  });
+
+  const testVendor = funnel('node_modules', {
+    include: ['sinon/pkg/sinon.js']
+  });
+
+  var test = funnel('test', {
+    include: ['**/*.js']
+  });
+
+  test = esTranspiler(test, {
+    stage: 0,
+    moduleIds: true,
+    modules: 'amd',
+    sourceMaps: true,
+  });
+
+  test = mergeTrees([bundle, testVendor, test, testIndex]);
+
+  test = testem(test, {
+    ci: process.env.CI === 'true',
+    'framework': 'mocha+chai',
+    'test_page': 'index.mustache',
+    'disable_watching': true,
+    'src_files': [
+      '**/*.js',
+    ],
+    'launch_in_ci': [
+      'PhantomJS'
+    ],
+    'launch_in_dev': [
+      'PhantomJS',
+      'Chrome'
+    ]
+  });
+
+  module.exports = test;
+} else {
+  module.exports = mergeTrees([bundle, indexHtml]);
+}

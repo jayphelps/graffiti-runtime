@@ -6,8 +6,8 @@
   "scripts": {
     "start": "broccoli serve",
     "build": "rm -rf dist && broccoli build dist",
-    "test": "mocha",
-    "tdd": "mocha --watch"
+    "test": "NODE_ENV=test CI=true npm run build",
+    "test:server": "NODE_ENV=test broccoli serve"
   },
   "repository": {
     "type": "git",
@@ -26,6 +26,7 @@
     "broccoli-concat": "^0.0.13",
     "broccoli-funnel": "^0.2.3",
     "broccoli-merge-trees": "^0.2.1",
+    "broccoli-testem-plugin": "0.0.1",
     "chai": "^2.2.0",
     "glob": "^5.0.3",
     "htmlbars": "0.13.30",

@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import reflectToAttribute from '../../../../src/graffiti/decorators/reflectToAttribute';
+import reflectToAttribute from '../../../../graffiti/decorators/reflectToAttribute';
 import { spy } from 'sinon';
 
 var initializerCallCount = 0;
